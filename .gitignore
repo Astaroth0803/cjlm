@@ -1,0 +1,51 @@
+# ========================
+# Python / Django
+# ========================
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.egg-info/
+.eggs/
+dist/
+build/
+
+# Virtual environments
+env/
+venv/
+.venv/
+
+# Django
+backend/staticfiles/
+backend/media/
+backend/*.log
+db.sqlite3
+
+# Environment variables
+.env
+*.env
+.env.local
+.env.production
+
+# ========================
+# Node / Vue
+# ========================
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+frontend/*.local
+
+# ========================
+# IDEs / Editors
+# ========================
+.vscode/
+.idea/
+*.suo
+*.user
+
+# ========================
+# OS
+# ========================
+.DS_Store
+Thumbs.db
+desktop.ini
