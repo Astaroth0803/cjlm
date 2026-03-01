@@ -4,7 +4,7 @@ from rest_framework.response import Response
 from django.db.models import Count
 from core.models import Beneficiary, Activity
 from .models import AttendanceRecord
-from datetime import date
+from datetime import date, timedelta
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
@@ -18,18 +18,27 @@ def dashboard_stats(request):
     # Top Activity
     top_activity = Activity.objects.annotate(attendance_count=Count('events__attendances')).order_by('-attendance_count').first()
     
-    # Chart Data (Last 7 days attendance)
-    # Simple aggregation for chart
-    from datetime import timedelta
-    last_7_days = [today - timedelta(days=i) for i in range(6, -1, -1)]
-    chart_data = []
+    from django.db.models.functions import ExtractYear, ExtractMonth
     
-    for day in last_7_days:
-        count = AttendanceRecord.objects.filter(date=day).count()
-        chart_data.append({
-            'date': day.strftime('%d %b'),
-            'count': count
-        })
+    # Chart Data (Annual comparison, last 3 years)
+    current_year = today.year
+    years = [current_year, current_year - 1, current_year - 2]
+    
+    annual_data = {
+        y: [0]*12 for y in years
+    }
+    
+    qs = AttendanceRecord.objects.filter(date__year__in=years).annotate(
+        year=ExtractYear('date'),
+        month=ExtractMonth('date')
+    ).values('year', 'month').annotate(count=Count('id'))
+    
+    for row in qs:
+        annual_data[row['year']][row['month'] - 1] = row['count']
+        
+    chart_series = [
+        {'name': str(y), 'data': annual_data[y]} for y in years
+    ]
 
     # Top 5 Attendees
     top_attendees_qs = Beneficiary.objects.annotate(
@@ -49,7 +58,7 @@ def dashboard_stats(request):
         'attendances_today': attendances_today,
         'active_users': active_users,
         'top_activity_name': top_activity.name if top_activity else 'N/A',
-        'chart_data': chart_data,
+        'chart_data': chart_series,
         'top_attendees': top_attendees
     })
 
@@ -118,6 +127,46 @@ def activity_attendance_report(request):
         })
         
     return Response(data)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def event_report(request):
+    """
+    Returns attendance count grouped by event (with event date), for the 'Por Evento' report.
+    Query params: start_date, end_date
+    """
+    start_date = request.GET.get('start_date')
+    end_date = request.GET.get('end_date')
+
+    qs = AttendanceRecord.objects.select_related('event__activity').all()
+
+    if start_date:
+        qs = qs.filter(date__gte=start_date)
+    if end_date:
+        qs = qs.filter(date__lte=end_date)
+
+    report_data = qs.values(
+        'event__id',
+        'event__name',
+        'event__date',
+        'event__activity__name',
+    ).annotate(
+        attendees=Count('beneficiary', distinct=True)
+    ).order_by('-attendees', 'event__activity__name')
+
+    data = []
+    for r in report_data:
+        data.append({
+            'event_id': r['event__id'],
+            'event_name': r['event__name'],
+            'event_date': r['event__date'].strftime('%Y-%m-%d') if r['event__date'] else '-',
+            'activity_name': r['event__activity__name'],
+            'attendees': r['attendees'],
+        })
+
+    return Response(data)
+
 
 from django.shortcuts import get_object_or_404
 
@@ -252,3 +301,38 @@ def event_attendees_detail(request):
 
     return Response(list(seen.values()))
 
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def attendance_chart_data(request):
+    """
+    Returns daily attendance counts for the given date range.
+    Query params: start_date, end_date
+    """
+    start_date_str = request.GET.get('start_date')
+    end_date_str = request.GET.get('end_date')
+
+    if not start_date_str or not end_date_str:
+        # Default: last 7 days
+        end_dt = date.today()
+        start_dt = end_dt - timedelta(days=6)
+    else:
+        from datetime import datetime
+        start_dt = datetime.strptime(start_date_str, '%Y-%m-%d').date()
+        end_dt = datetime.strptime(end_date_str, '%Y-%m-%d').date()
+
+    # Build list of all days in range
+    delta = (end_dt - start_dt).days + 1
+    days = [start_dt + timedelta(days=i) for i in range(delta)]
+
+    # Aggregate attendance per day
+    qs = AttendanceRecord.objects.filter(
+        date__gte=start_dt, date__lte=end_dt
+    ).values('date').annotate(count=Count('id')).order_by('date')
+
+    counts_by_date = {r['date']: r['count'] for r in qs}
+
+    labels = [d.strftime('%d %b') for d in days]
+    data = [counts_by_date.get(d, 0) for d in days]
+
+    return Response({'labels': labels, 'data': data})

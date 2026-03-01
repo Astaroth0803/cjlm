@@ -21,6 +21,13 @@
                   <span>Actividades más visitadas</span>
                   <svg v-if="selectedReport === 'activities'" class="w-5 h-5 text-orange-500" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"></path></svg>
               </button>
+
+              <button @click="selectedReport = 'events'" 
+                      :class="['w-full flex items-center justify-between px-3 py-3 rounded-lg text-sm font-medium transition-colors', 
+                              selectedReport === 'events' ? 'bg-orange-50 text-orange-700' : 'text-gray-600 hover:bg-gray-50']">
+                  <span>Por Evento</span>
+                  <svg v-if="selectedReport === 'events'" class="w-5 h-5 text-orange-500" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"></path></svg>
+              </button>
           </nav>
       </div>
 
@@ -29,7 +36,7 @@
         <div class="flex justify-between items-end">
             <div>
                 <h2 class="text-2xl font-bold text-gray-800">
-                    {{ selectedReport === 'attendance' ? 'Reporte de Asistencia' : 'Actividades con más asistencias' }}
+                    {{ selectedReport === 'attendance' ? 'Reporte de Asistencia' : selectedReport === 'activities' ? 'Actividades con más asistencias' : selectedReport === 'events' ? 'Reporte por Evento' : 'Historial de Asistencias por Día' }}
                 </h2>
                 <p class="text-gray-500 mt-1">Filtra y exporta el historial.</p>
             </div>
@@ -120,7 +127,9 @@
           </div>
 
           <template v-else>
-            <!-- Table: Attendance History -->
+            <transition name="fade-slide" mode="out-in" appear>
+              <div :key="selectedReport">
+              <!-- Table: Attendance History -->
             <table v-if="selectedReport === 'attendance'" class="min-w-full divide-y divide-gray-200">
                 <thead class="bg-gray-50">
                     <tr>
@@ -175,6 +184,39 @@
                     </tr>
                 </tbody>
             </table>
+
+            <!-- Table: Por Evento -->
+            <table v-if="selectedReport === 'events'" class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Evento</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actividad</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fecha Evento</th>
+                        <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Asistentes Únicos</th>
+                        <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-16">Detalle</th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+                    <tr v-for="(record, idx) in eventRecords" :key="idx" class="hover:bg-gray-50">
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">{{ record.event_name }}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{{ record.activity_name }}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ record.event_date }}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-center text-orange-600 bg-orange-50">{{ record.attendees }}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-center">
+                            <button
+                              @click="openAttendeesModal(record)"
+                              class="w-7 h-7 rounded-full bg-orange-600 text-white hover:bg-orange-700 transition-all flex items-center justify-center mx-auto font-bold text-base shadow-sm"
+                              title="Ver asistentes"
+                            >+</button>
+                        </td>
+                    </tr>
+                    <tr v-if="eventRecords.length === 0">
+                        <td colspan="5" class="px-6 py-10 text-center text-gray-400">Sin resultados para el rango seleccionado.</td>
+                    </tr>
+                </tbody>
+            </table>
+              </div>
+            </transition>
           </template>
         </div>
 
@@ -325,9 +367,10 @@ const exportAttendeesPDF = () => {
 }
 // --- END Modal ---
 
-const selectedReport = ref('attendance') // 'attendance' or 'activities'
+const selectedReport = ref('attendance') // 'attendance', 'activities', or 'events'
 const attendanceRecords = ref([])
 const activityRecords = ref([])
+const eventRecords = ref([])
 
 const filters = ref({
     start_date: '',
@@ -337,7 +380,9 @@ const filters = ref({
 })
 
 const currentRecords = computed(() => {
-    return selectedReport.value === 'attendance' ? attendanceRecords.value : activityRecords.value
+    if (selectedReport.value === 'attendance') return attendanceRecords.value
+    if (selectedReport.value === 'activities') return activityRecords.value
+    return eventRecords.value
 })
 
 // Reset results when switching report type, require a new search
@@ -345,6 +390,7 @@ watch(selectedReport, () => {
     hasSearched.value = false
     attendanceRecords.value = []
     activityRecords.value = []
+    eventRecords.value = []
     filters.value.start_time = ''
     filters.value.end_time = ''
 })
@@ -363,9 +409,12 @@ const fetchReport = async () => {
         if (selectedReport.value === 'attendance') {
             const res = await apiClient.get(`reports/attendance/?${params.toString()}`)
             attendanceRecords.value = res.data
-        } else {
+        } else if (selectedReport.value === 'activities') {
             const res = await apiClient.get(`reports/activity-attendance/?${params.toString()}`)
             activityRecords.value = res.data
+        } else {
+            const res = await apiClient.get(`reports/event-report/?${params.toString()}`)
+            eventRecords.value = res.data
         }
     } catch (e) {
         console.error("Error fetching report", e)
@@ -490,4 +539,17 @@ const exportToPDF = () => {
 onMounted(() => {
     // Don't auto-load: require user to apply a filter first
 })
+
 </script>
+
+<style scoped>
+.fade-slide-enter-active,
+.fade-slide-leave-active {
+  transition: all 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.fade-slide-enter-from,
+.fade-slide-leave-to {
+  opacity: 0;
+  transform: translateY(15px);
+}
+</style>

@@ -10,7 +10,7 @@ from core.views import (
     PublicBeneficiaryViewSet, PublicActivityViewSet
 )
 from attendance.views import AttendanceRecordViewSet, PublicAttendanceViewSet
-from attendance.api_views import dashboard_stats, attendance_report, activity_attendance_report, beneficiary_profile_report, activity_profile_report, event_attendees_detail
+from attendance.api_views import dashboard_stats, attendance_report, activity_attendance_report, beneficiary_profile_report, activity_profile_report, event_attendees_detail, event_report, attendance_chart_data
 
 router = DefaultRouter()
 # Secured Endpoints
@@ -34,6 +34,8 @@ urlpatterns = [
     path('api/reports/beneficiary-profile/<int:pk>/', beneficiary_profile_report, name='beneficiary_profile_report'),
     path('api/reports/activity-profile/<int:pk>/', activity_profile_report, name='activity_profile_report'),
     path('api/reports/event-attendees/', event_attendees_detail, name='event_attendees_detail'),
+    path('api/reports/event-report/', event_report, name='event_report'),
+    path('api/reports/chart/', attendance_chart_data, name='attendance_chart_data'),
     path('api/token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
     path('api/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
 ]

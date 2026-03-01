@@ -15,7 +15,7 @@
             <div class="bg-white p-6 rounded-lg shadow-sm flex items-center justify-between border-l-4 border-orange-500">
                 <div>
                     <p class="text-gray-500 text-sm font-medium">Asistencias Hoy</p>
-                    <p class="text-3xl font-bold text-gray-900">{{ stats.attendances_today }}</p>
+                    <p class="text-3xl font-bold text-gray-900"><AnimatedCounter :value="stats.attendances_today" /></p>
                 </div>
                 <div class="w-12 h-12 bg-orange-100 text-orange-600 rounded-full flex items-center justify-center text-xl">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" /></svg>
@@ -24,7 +24,7 @@
             <div class="bg-white p-6 rounded-lg shadow-sm flex items-center justify-between border-l-4 border-blue-500">
                 <div>
                     <p class="text-gray-500 text-sm font-medium">Usuarios Activos</p>
-                    <p class="text-3xl font-bold text-gray-900">{{ stats.active_users }}</p>
+                    <p class="text-3xl font-bold text-gray-900"><AnimatedCounter :value="stats.active_users" /></p>
                 </div>
                 <div class="w-12 h-12 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center text-xl">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5.121 17.804A13.937 13.937 0 0112 16c2.5 0 4.847.655 6.879 1.804M15 10a3 3 0 11-6 0 3 3 0 016 0zm6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
@@ -46,14 +46,19 @@
             
             <!-- Charts Area -->
             <div class="bg-white p-6 rounded-lg shadow-sm flex-1">
-              <h3 class="text-lg font-bold text-gray-800 mb-4">Asistencias - Últimos 7 Días</h3>
-              <apexchart type="bar" height="350" :options="chartOptions" :series="chartSeries"></apexchart>
+              <h3 class="text-lg font-bold text-gray-800 mb-4">Asistencia Anual</h3>
+              <transition name="fade-slide" appear>
+                <div v-show="!loading">
+                  <apexchart type="area" height="320" :options="chartOptions" :series="chartSeries"></apexchart>
+                </div>
+              </transition>
             </div>
 
             <!-- Top 5 Attendees Table -->
             <div class="bg-white p-6 rounded-lg shadow-sm flex-1">
               <h3 class="text-lg font-bold text-gray-800 mb-4">Top 5 Usuarios Destacados</h3>
-              <div class="overflow-x-auto rounded-lg border border-gray-100">
+              <transition name="fade-slide" appear>
+              <div v-show="!loading" class="overflow-x-auto rounded-lg border border-gray-100">
                 <table class="min-w-full divide-y divide-gray-200">
                   <thead class="bg-gray-50">
                     <tr>
@@ -87,6 +92,7 @@
                   </tbody>
                 </table>
               </div>
+              </transition>
             </div>
 
           </div>
@@ -99,6 +105,7 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import apiClient from '../plugins/axios'
+import AnimatedCounter from '../components/AnimatedCounter.vue'
 
 const loading = ref(true)
 const stats = ref({
@@ -110,38 +117,34 @@ const stats = ref({
 })
 
 const chartOptions = ref({
-    chart: { type: 'bar', toolbar: { show: false } },
-    colors: ['#ea580c'], // Tailwind Orange-600
-    plotOptions: {
-        bar: { borderRadius: 4, horizontal: false, columnWidth: '50%' }
-    },
+    chart: { type: 'area', toolbar: { show: false } },
+    colors: ['#ea580c', '#6366f1', '#eab308'], // Naranja, Indigo, Amarillo
+    stroke: { curve: 'smooth', width: 3 },
+    markers: { size: 4 },
     dataLabels: { enabled: false },
-    xaxis: { categories: [] }
+    xaxis: { categories: ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'] },
+    grid: { borderColor: '#f1f5f9' },
+    tooltip: { y: { formatter: val => `${val} asistencias` } },
+    fill: {
+        type: 'gradient',
+        gradient: {
+            shadeIntensity: 1,
+            opacityFrom: 0.4,
+            opacityTo: 0.05,
+            stops: [0, 90, 100]
+        }
+    }
 })
 
-const chartSeries = ref([{
-    name: 'Asistencias',
-    data: []
-}])
+const chartSeries = ref([{ name: 'Asistencias', data: [] }])
 
 const fetchStats = async () => {
     try {
         const res = await apiClient.get('dashboard-stats/')
         stats.value = res.data
-        
-        // Formatear datos para ApexCharts (orden ascendente por fecha)
-        const sortedData = res.data.chart_data.reverse()
-        chartOptions.value = {
-            ...chartOptions.value,
-            xaxis: {
-                categories: sortedData.map(item => item.date)
-            }
+        if (res.data.chart_data) {
+            chartSeries.value = res.data.chart_data
         }
-        chartSeries.value = [{
-            name: 'Asistencias',
-            data: sortedData.map(item => item.count)
-        }]
-
     } catch (e) {
         console.error("Error fetching stats:", e)
     } finally {
@@ -149,5 +152,19 @@ const fetchStats = async () => {
     }
 }
 
-onMounted(() => fetchStats())
+onMounted(() => {
+    fetchStats()
+})
 </script>
+
+<style scoped>
+.fade-slide-enter-active,
+.fade-slide-leave-active {
+  transition: all 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.fade-slide-enter-from,
+.fade-slide-leave-to {
+  opacity: 0;
+  transform: translateY(20px);
+}
+</style>

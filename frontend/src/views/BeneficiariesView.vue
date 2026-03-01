@@ -6,7 +6,7 @@
 
      <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
        <h1 class="text-3xl font-bold text-gray-800">Manejo de Usuarios</h1>
-       <div class="flex flex-col sm:flex-row w-full sm:w-auto">
+       <div class="flex flex-col sm:flex-row w-full sm:w-auto gap-3">
           <div class="relative w-full sm:w-64">
              <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                 <svg class="h-5 w-5 text-gray-400" viewBox="0 0 20 20" fill="currentColor">
@@ -14,6 +14,20 @@
                 </svg>
              </div>
              <input v-model="searchQuery" type="text" placeholder="Buscar por nombre o cédula..." class="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-orange-500 focus:border-orange-500 sm:text-sm shadow-sm transition-colors">
+          </div>
+          <div class="flex gap-2">
+            <button @click="exportToExcel" :disabled="!filteredAndSortedBeneficiaries.length" class="flex flex-row items-center justify-center gap-2 px-4 py-2 bg-green-50 text-green-700 rounded-md hover:bg-green-100 font-medium disabled:opacity-50 transition-colors">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-5 h-5">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m5.231 13.481L15 17.25m-4.5-15H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Zm3.75 11.625a1.125 1.125 0 1 1-2.25 0 1.125 1.125 0 0 1 2.25 0Zm-8.25 4.125c0-.621.504-1.125 1.125-1.125h5.25c.621 0 1.125.504 1.125 1.125v.75c0 .621-.504 1.125-1.125 1.125H6.375a1.125 1.125 0 0 1-1.125-1.125v-.75Z" />
+                </svg>
+                Excel
+            </button>
+            <button @click="exportToPDF" :disabled="!filteredAndSortedBeneficiaries.length" class="flex flex-row items-center justify-center gap-2 px-4 py-2 bg-red-50 text-red-600 rounded-md hover:bg-red-100 font-medium disabled:opacity-50 transition-colors">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-5 h-5">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" />
+                </svg>
+                PDF
+            </button>
           </div>
        </div>
      </div>
@@ -81,8 +95,9 @@
 <script setup>
 import { ref, onMounted, computed } from 'vue'
 import apiClient from '../plugins/axios'
-
-
+import jsPDF from 'jspdf'
+import autoTable from 'jspdf-autotable'
+import * as XLSX from 'xlsx'
 const beneficiaries = ref([])
 const showForm = ref(false)
 const form = ref({
@@ -169,6 +184,75 @@ const filteredAndSortedBeneficiaries = computed(() => {
 
     return result
 })
+
+const getLocalISODateStr = (d) => {
+    const y = d.getFullYear()
+    const m = String(d.getMonth() + 1).padStart(2, '0')
+    const day = String(d.getDate()).padStart(2, '0')
+    const h = String(d.getHours()).padStart(2, '0')
+    const min = String(d.getMinutes()).padStart(2, '0')
+    return `${y}-${m}-${day}_${h}${min}`
+}
+
+const exportToPDF = () => {
+    if (!filteredAndSortedBeneficiaries.value.length) return
+    
+    const doc = new jsPDF()
+    doc.text("Listado de Usuarios", 14, 15)
+    
+    const head = [['Nombre Completo', 'Cédula', 'Fecha Nacimiento', 'Sector']]
+    const bodyDate = filteredAndSortedBeneficiaries.value.map(b => [
+        `${b.first_name} ${b.last_name}`,
+        b.ci,
+        b.dob || 'N/A',
+        b.sector || 'N/A'
+    ])
+    
+    autoTable(doc, {
+        head: head,
+        body: bodyDate,
+        startY: 25,
+        theme: 'grid',
+        headStyles: { fillColor: [234, 88, 12] } // Orange-600
+    })
+    
+    doc.save(`Usuarios_${getLocalISODateStr(new Date())}.pdf`)
+}
+
+const exportToExcel = () => {
+    if (!filteredAndSortedBeneficiaries.value.length) return
+    
+    const data = filteredAndSortedBeneficiaries.value.map(b => ({
+        'Nombre Completo': `${b.first_name} ${b.last_name}`,
+        'Cédula': b.ci,
+        'Fecha Nacimiento': b.dob || 'N/A',
+        'Sector': b.sector || 'N/A'
+    }))
+    
+    const ws = XLSX.utils.json_to_sheet(data)
+    
+    // Auto-size columns slightly
+    const colWidths = [
+      { wch: 35 }, // Nombre
+      { wch: 20 }, // Cédula
+      { wch: 20 }, // Fecha Nacimiento
+      { wch: 30 }, // Sector
+    ];
+    ws['!cols'] = colWidths;
+    
+    // Hacer la cabecera en negrita
+    const range = XLSX.utils.decode_range(ws['!ref'])
+    for (let c = range.s.c; c <= range.e.c; c++) {
+        const cellAddress = XLSX.utils.encode_cell({ r: 0, c: c })
+        if (!ws[cellAddress]) continue
+        ws[cellAddress].s = { font: { bold: true } }
+    }
+    
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, "Usuarios")
+    
+    XLSX.writeFile(wb, `Usuarios_${getLocalISODateStr(new Date())}.xlsx`)
+}
 
 onMounted(() => fetchItems())
 </script>
