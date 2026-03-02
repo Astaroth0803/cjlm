@@ -194,6 +194,11 @@
       <div class="flex-1 dark:bg-gray-900 transition-colors">
         <router-view />
       </div>
+
+      <!-- Footer -->
+      <footer class="py-4 text-center text-xs text-gray-400 dark:text-gray-500 mt-auto shrink-0 transition-colors">
+        <p>Made with <span class="text-red-500">❤️</span> by AngelP</p>
+      </footer>
     </main>
 
   </div>
