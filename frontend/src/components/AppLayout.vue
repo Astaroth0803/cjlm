@@ -71,11 +71,6 @@
           Admin
         </router-link>
 
-      
-
-
-
-
         <!-- Divider -->
         <div class="pt-4 pb-2">
           <div class="border-t border-gray-100 dark:border-gray-700"></div>
@@ -130,7 +125,7 @@
           
           <!-- Dynamic Greeting -->
           <div class="hidden lg:flex items-center text-center truncate shrink-0">
-            <span class="text-sm font-bold text-gray-800 dark:text-gray-200 truncate transition-colors">{{ dynamicGreeting }}, <span class="text-orange-600 dark:text-orange-400">Admin</span>! {{ greetingEmoji }}</span>
+            <span class="text-sm font-bold text-gray-800 dark:text-gray-200 truncate transition-colors">{{ dynamicGreeting }}, <span class="text-orange-600 dark:text-orange-400">{{ user.first_name || user.username }} {{ user.last_name }}</span>! {{ greetingEmoji }}</span>
           </div>
         </div>
 
@@ -190,7 +185,7 @@
                 <path fill-rule="evenodd" d="M7.5 6a4.5 4.5 0 1 1 9 0 4.5 4.5 0 0 1-9 0ZM3.751 20.105a8.25 8.25 0 0 1 16.498 0 .75.75 0 0 1-.437.695A18.683 18.683 0 0 1 12 22.5c-2.786 0-5.433-.608-7.812-1.7a.75.75 0 0 1-.437-.695Z" clip-rule="evenodd" />
               </svg>
             </div>
-            <span class="text-sm font-semibold text-gray-600 hidden sm:block">Admin</span>
+            <span class="text-sm font-semibold text-gray-600 hidden sm:block">{{ user.first_name || user.username }}</span>
           </div>
         </div>
       </header>
@@ -212,6 +207,7 @@ import { useRouter, useRoute } from 'vue-router'
 const router = useRouter()
 const route = useRoute()
 const isSidebarOpen = ref(false)
+const user = ref({ first_name: 'Cargando...', last_name: '' })
 
 watch(() => route.path, () => {
     isSidebarOpen.value = false
@@ -315,6 +311,22 @@ const fetchNotifications = async () => {
   }
 }
 
+// Fetch User Profile Data
+const fetchUser = async () => {
+  try {
+    const token = localStorage.getItem('access_token')
+    if (token) {
+      const payload = JSON.parse(atob(token.split('.')[1]))
+      if (payload.user_id) {
+        const res = await apiClient.get(`users/${payload.user_id}/`)
+        user.value = res.data
+      }
+    }
+  } catch (error) {
+    console.error("Error fetching user", error)
+  }
+}
+
 // Click outside to close notifications Dropdown
 const handleClickOutside = (e) => {
   if (isNotifOpen.value) {
@@ -330,6 +342,7 @@ onMounted(() => {
   updateGreeting()
   fetchWeather()
   fetchNotifications()
+  fetchUser()
   document.addEventListener('click', handleClickOutside)
 })
 
